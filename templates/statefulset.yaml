@@ -1,0 +1,153 @@
+{{- $volumeClaimTemplateLabels := dict -}}
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) -}}
+{{- $existingStatefulSet := lookup "apps/v1" "StatefulSet" .Release.Namespace (include "celld.fullname" .) -}}
+{{- if $existingStatefulSet -}}
+{{- $existingVolumeClaimTemplates := dig "spec" "volumeClaimTemplates" (list) $existingStatefulSet -}}
+{{- if gt (len $existingVolumeClaimTemplates) 0 -}}
+{{- $volumeClaimTemplateLabels = dig "metadata" "labels" (dict) (index $existingVolumeClaimTemplates 0) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "celld.fullname" . }}
+  labels:
+    {{- include "celld.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  serviceName: {{ include "celld.fullname" . }}-internal
+  selector:
+    matchLabels:
+      {{- include "celld.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "celld.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "celld.serviceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: celld
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              exec /usr/local/bin/celld \
+                --listen 0.0.0.0:{{ .Values.server.httpPort }} \
+                --internal-listen 0.0.0.0:{{ .Values.server.internalPort }} \
+                --advertise "${POD_IP}:{{ .Values.server.internalPort }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.server.httpPort }}
+              protocol: TCP
+            - name: internal
+              containerPort: {{ .Values.server.internalPort }}
+              protocol: TCP
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: CELLD_WATCH
+              value: /var/lib/celld/state
+            {{- if .Values.celld.bucket }}
+            - name: CELLD_BUCKET
+              value: {{ .Values.celld.bucket | quote }}
+            {{- end }}
+            {{- if .Values.celld.region }}
+            - name: AWS_REGION
+              value: {{ .Values.celld.region | quote }}
+            - name: AWS_DEFAULT_REGION
+              value: {{ .Values.celld.region | quote }}
+            {{- end }}
+            {{- if .Values.celld.endpoint }}
+            - name: S3_ENDPOINT
+              value: {{ .Values.celld.endpoint | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if or .Values.credentials.existingSecret .Values.extraEnvFrom }}
+          envFrom:
+            {{- if .Values.credentials.existingSecret }}
+            - secretRef:
+                name: {{ .Values.credentials.existingSecret }}
+            {{- end }}
+            {{- with .Values.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /__celld/health
+              port: http
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /__celld/health
+              port: http
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/celld
+            - name: tmp
+              mountPath: /tmp
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.persistence.existingClaim }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim }}
+        {{- else if not .Values.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- if $volumeClaimTemplateLabels }}
+          {{- toYaml $volumeClaimTemplateLabels | nindent 10 }}
+          {{- else }}
+          {{- include "celld.labels" . | nindent 10 }}
+          {{- end }}
+      spec:
+        accessModes:
+          {{- toYaml .Values.persistence.accessModes | nindent 10 }}
+        {{- if .Values.persistence.storageClassName }}
+        storageClassName: {{ .Values.persistence.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size | quote }}
+{{- end }}

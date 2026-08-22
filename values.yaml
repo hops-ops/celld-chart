@@ -1,0 +1,88 @@
+nameOverride: ""
+fullnameOverride: ""
+
+commonLabels: {}
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/denoland/celld
+  tag: "v0.3.0"
+  pullPolicy: IfNotPresent
+
+celld:
+  # Fleet bucket. S3 (`s3://bucket`), GCS (`gs://bucket`), or Azure (`az://container`).
+  # Optional key prefix: s3://bucket/prefix
+  bucket: ""
+  # S3-compatible endpoint (R2, Tigris). Leave empty for AWS S3.
+  endpoint: ""
+  region: us-east-2
+
+server:
+  httpPort: 8080
+  internalPort: 8081
+
+credentials:
+  # Secret with AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (and optional AWS_SESSION_TOKEN).
+  # For GCS use GOOGLE_APPLICATION_CREDENTIALS via extraEnv + extraVolume, or ADC.
+  existingSecret: ""
+
+extraEnv: []
+extraEnvFrom: []
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  existingClaim: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+  labels: {}
+  annotations: {}
+
+internalService:
+  labels: {}
+  annotations: {}
+
+podLabels: {}
+podAnnotations: {}
+
+# celld's published image is debian:bookworm-slim with no dedicated runtime user.
+podSecurityContext: {}
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 2Gi
+
+terminationGracePeriodSeconds: 35
+
+probes:
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 6
+  liveness:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 2
+    failureThreshold: 6
