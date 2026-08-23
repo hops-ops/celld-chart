@@ -94,7 +94,9 @@ spec:
                 i=$((i + 1))
                 sleep 1
               done
-              celld deploy /placeholder --bucket "$CELLD_BUCKET"
+              mkdir -p /tmp/worker
+              cp -L /placeholder/index.js /placeholder/wrangler.jsonc /tmp/worker/
+              celld deploy /tmp/worker --bucket "$CELLD_BUCKET"
           volumeMounts:
             - name: placeholder
               mountPath: /placeholder
