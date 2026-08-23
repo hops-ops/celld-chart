@@ -44,7 +44,7 @@ azurite:
   accountKey: Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
   image:
     repository: mcr.microsoft.com/azure-storage/azurite
-    tag: "3.34.0"
+    tag: "3.36.0"
     pullPolicy: IfNotPresent
   initImage:
     repository: mcr.microsoft.com/azure-cli
