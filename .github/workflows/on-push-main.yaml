@@ -35,3 +35,9 @@ jobs:
       DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
     with:
       useDeployKey: true
+      changelog: true
+      yqPatches: |
+        patches:
+          - filePath: Chart.yaml
+            selector: .version
+            valuePrefix: ""
