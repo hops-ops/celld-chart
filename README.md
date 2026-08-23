@@ -18,6 +18,18 @@ helm install celld celld/celld \
   --set credentials.existingSecret=celld-aws
 ```
 
+AWS S3 (credentials via a Secret with `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`):
+
+```bash
+helm install celld celld/celld \
+  --namespace celld \
+  --create-namespace \
+  --set celld.bucket=s3://my-cells-bucket \
+  --set celld.region=us-east-2 \
+  --set credentials.existingSecret=celld-aws \
+  --set bootstrapPlaceholder=true
+```
+
 Local / kind (in-cluster Azurite, same shape as `distributed/tests/celld/docker-compose.yml`):
 
 ```bash

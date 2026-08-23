@@ -2,6 +2,7 @@
 {{- if and .Values.azurite.enabled (not $bucket) -}}
 {{- $bucket = printf "az://%s" .Values.azurite.container -}}
 {{- end -}}
+{{- $placeholder := or .Values.bootstrapPlaceholder (and .Values.azurite.enabled .Values.azurite.bootstrapPlaceholder) -}}
 {{- $volumeClaimTemplateLabels := dict -}}
 {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) -}}
 {{- $existingStatefulSet := lookup "apps/v1" "StatefulSet" .Release.Namespace (include "celld.fullname" .) -}}
@@ -42,8 +43,9 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.azurite.enabled }}
+      {{- if or .Values.azurite.enabled $placeholder }}
       initContainers:
+        {{- if .Values.azurite.enabled }}
         - name: azurite-init
           image: "{{ .Values.azurite.initImage.repository }}:{{ .Values.azurite.initImage.tag }}"
           imagePullPolicy: {{ .Values.azurite.initImage.pullPolicy }}
@@ -65,26 +67,42 @@ spec:
               done
               echo "azurite did not accept container create" >&2
               exit 1
-        {{- if .Values.azurite.bootstrapPlaceholder }}
+        {{- end }}
+        {{- if $placeholder }}
         - name: celld-deploy
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if or .Values.azurite.enabled .Values.credentials.existingSecret }}
           envFrom:
+            {{- if .Values.azurite.enabled }}
             - secretRef:
                 name: {{ include "celld.azurite.secretName" . }}
+            {{- end }}
+            {{- if .Values.credentials.existingSecret }}
+            - secretRef:
+                name: {{ .Values.credentials.existingSecret }}
+            {{- end }}
+          {{- end }}
           env:
             - name: CELLD_BUCKET
               value: {{ $bucket | quote }}
+            {{- if and (not .Values.azurite.enabled) .Values.celld.region }}
+            - name: AWS_REGION
+              value: {{ .Values.celld.region | quote }}
+            - name: AWS_DEFAULT_REGION
+              value: {{ .Values.celld.region | quote }}
+            {{- end }}
           command:
             - /bin/sh
             - -c
             - |
               set -eu
               apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends socat curl ca-certificates xz-utils
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends {{ if .Values.azurite.enabled }}socat {{ end }}curl ca-certificates xz-utils
               cd /tmp
               curl -fsSL https://esbuild.github.io/dl/v0.25.5 | sh
               export PATH="/tmp:$PATH"
+              {{- if .Values.azurite.enabled }}
               socat TCP-LISTEN:{{ .Values.azurite.blobPort }},bind=127.0.0.1,fork,reuseaddr TCP:{{ include "celld.azurite.fullname" . }}:{{ .Values.azurite.blobPort }} &
               i=0
               while [ "$i" -lt 30 ]; do
@@ -94,6 +112,7 @@ spec:
                 i=$((i + 1))
                 sleep 1
               done
+              {{- end }}
               mkdir -p /tmp/worker
               cp -L /placeholder/index.js /placeholder/wrangler.jsonc /tmp/worker/
               celld deploy /tmp/worker --bucket "$CELLD_BUCKET"
@@ -180,7 +199,7 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
-          {{- if .Values.azurite.enabled }}
+          {{- if or .Values.azurite.enabled $placeholder }}
           startupProbe:
             httpGet:
               path: /__celld/health
@@ -217,7 +236,7 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
-        {{- if and .Values.azurite.enabled .Values.azurite.bootstrapPlaceholder }}
+        {{- if $placeholder }}
         - name: placeholder
           configMap:
             name: {{ include "celld.fullname" . }}-placeholder

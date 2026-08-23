@@ -1,4 +1,4 @@
-{{- if and .Values.azurite.enabled .Values.azurite.bootstrapPlaceholder }}
+{{- if or .Values.bootstrapPlaceholder (and .Values.azurite.enabled .Values.azurite.bootstrapPlaceholder) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

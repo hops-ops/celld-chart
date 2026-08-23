@@ -27,6 +27,10 @@ credentials:
   # For GCS use GOOGLE_APPLICATION_CREDENTIALS via extraEnv + extraVolume, or ADC.
   existingSecret: ""
 
+# Deploy a tiny fetch-only worker so celld can boot before a real app is uploaded.
+# Used for Azurite and for a fresh S3 bucket (celld requires deploy/current.json).
+bootstrapPlaceholder: false
+
 # Local/dev only. Deploys Azurite and points celld at it (az:// container).
 # Not a production fleet store. Matches tests/celld/docker-compose.yml:
 # celld's Azure emulator client always uses 127.0.0.1:10000, so a socat
@@ -50,7 +54,6 @@ azurite:
     repository: docker.io/alpine/socat
     tag: "1.8.0.1"
     pullPolicy: IfNotPresent
-  # Deploy a tiny fetch-only worker so celld can boot before a real app is uploaded.
   bootstrapPlaceholder: true
   persistence:
     enabled: true
