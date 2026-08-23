@@ -1,0 +1,22 @@
+{{- if and .Values.azurite.enabled .Values.azurite.bootstrapPlaceholder }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "celld.fullname" . }}-placeholder
+  labels:
+    {{- include "celld.labels" . | nindent 4 }}
+    app.kubernetes.io/component: placeholder-worker
+data:
+  wrangler.jsonc: |
+    {
+      "name": "celld-placeholder",
+      "main": "index.js",
+      "compatibility_date": "2026-01-01"
+    }
+  index.js: |
+    export default {
+      fetch() {
+        return new Response("celld ok");
+      },
+    };
+{{- end }}

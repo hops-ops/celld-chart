@@ -50,6 +50,8 @@ azurite:
     repository: docker.io/alpine/socat
     tag: "1.8.0.1"
     pullPolicy: IfNotPresent
+  # Deploy a tiny fetch-only worker so celld can boot before a real app is uploaded.
+  bootstrapPlaceholder: true
   persistence:
     enabled: true
     size: 2Gi

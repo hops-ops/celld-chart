@@ -65,6 +65,40 @@ spec:
               done
               echo "azurite did not accept container create" >&2
               exit 1
+        {{- if .Values.azurite.bootstrapPlaceholder }}
+        - name: celld-deploy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ include "celld.azurite.secretName" . }}
+          env:
+            - name: CELLD_BUCKET
+              value: {{ $bucket | quote }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends socat curl ca-certificates xz-utils
+              cd /tmp
+              curl -fsSL https://esbuild.github.io/dl/v0.25.5 | sh
+              export PATH="/tmp:$PATH"
+              socat TCP-LISTEN:{{ .Values.azurite.blobPort }},bind=127.0.0.1,fork,reuseaddr TCP:{{ include "celld.azurite.fullname" . }}:{{ .Values.azurite.blobPort }} &
+              i=0
+              while [ "$i" -lt 30 ]; do
+                if socat /dev/null TCP:127.0.0.1:{{ .Values.azurite.blobPort }},connect-timeout=1 >/dev/null 2>&1; then
+                  break
+                fi
+                i=$((i + 1))
+                sleep 1
+              done
+              celld deploy /placeholder --bucket "$CELLD_BUCKET"
+          volumeMounts:
+            - name: placeholder
+              mountPath: /placeholder
+        {{- end }}
       {{- end }}
       containers:
         {{- if .Values.azurite.enabled }}
@@ -181,6 +215,11 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if and .Values.azurite.enabled .Values.azurite.bootstrapPlaceholder }}
+        - name: placeholder
+          configMap:
+            name: {{ include "celld.fullname" . }}-placeholder
+        {{- end }}
         {{- if .Values.persistence.existingClaim }}
         - name: data
           persistentVolumeClaim:
