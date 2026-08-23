@@ -2,7 +2,7 @@ apiVersion: v2
 name: celld
 description: Self-hosted Durable Objects runtime (denoland/celld) for Kubernetes.
 type: application
-version: 0.3.0
+version: 0.3.1
 appVersion: "v0.3.0"
 home: https://celld.dev
 sources:
