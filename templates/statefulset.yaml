@@ -1,3 +1,7 @@
+{{- $bucket := .Values.celld.bucket -}}
+{{- if and .Values.azurite.enabled (not $bucket) -}}
+{{- $bucket = printf "az://%s" .Values.azurite.container -}}
+{{- end -}}
 {{- $volumeClaimTemplateLabels := dict -}}
 {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) -}}
 {{- $existingStatefulSet := lookup "apps/v1" "StatefulSet" .Release.Namespace (include "celld.fullname" .) -}}
@@ -38,7 +42,45 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.azurite.enabled }}
+      initContainers:
+        - name: azurite-init
+          image: "{{ .Values.azurite.initImage.repository }}:{{ .Values.azurite.initImage.tag }}"
+          imagePullPolicy: {{ .Values.azurite.initImage.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ include "celld.azurite.secretName" . }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              i=0
+              while [ "$i" -lt 30 ]; do
+                if az storage container create -n {{ .Values.azurite.container | quote }} --connection-string "$AZURE_STORAGE_CONNECTION_STRING"; then
+                  exit 0
+                fi
+                i=$((i + 1))
+                sleep 2
+              done
+              echo "azurite did not accept container create" >&2
+              exit 1
+      {{- end }}
       containers:
+        {{- if .Values.azurite.enabled }}
+        - name: azurite-forward
+          image: "{{ .Values.azurite.socatImage.repository }}:{{ .Values.azurite.socatImage.tag }}"
+          imagePullPolicy: {{ .Values.azurite.socatImage.pullPolicy }}
+          args:
+            - TCP-LISTEN:{{ .Values.azurite.blobPort }},bind=127.0.0.1,fork,reuseaddr
+            - TCP:{{ include "celld.azurite.fullname" . }}:{{ .Values.azurite.blobPort }}
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
+        {{- end }}
         - name: celld
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -51,6 +93,9 @@ spec:
             - -c
             - |
               exec /usr/local/bin/celld \
+                {{- if $bucket }}
+                --bucket {{ $bucket | quote }} \
+                {{- end }}
                 --listen 0.0.0.0:{{ .Values.server.httpPort }} \
                 --internal-listen 0.0.0.0:{{ .Values.server.internalPort }} \
                 --advertise "${POD_IP}:{{ .Values.server.internalPort }}"
@@ -68,25 +113,29 @@ spec:
                   fieldPath: status.podIP
             - name: CELLD_WATCH
               value: /var/lib/celld/state
-            {{- if .Values.celld.bucket }}
+            {{- if $bucket }}
             - name: CELLD_BUCKET
-              value: {{ .Values.celld.bucket | quote }}
+              value: {{ $bucket | quote }}
             {{- end }}
-            {{- if .Values.celld.region }}
+            {{- if and (not .Values.azurite.enabled) .Values.celld.region }}
             - name: AWS_REGION
               value: {{ .Values.celld.region | quote }}
             - name: AWS_DEFAULT_REGION
               value: {{ .Values.celld.region | quote }}
             {{- end }}
-            {{- if .Values.celld.endpoint }}
+            {{- if and (not .Values.azurite.enabled) .Values.celld.endpoint }}
             - name: S3_ENDPOINT
               value: {{ .Values.celld.endpoint | quote }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- if or .Values.credentials.existingSecret .Values.extraEnvFrom }}
+          {{- if or .Values.azurite.enabled .Values.credentials.existingSecret .Values.extraEnvFrom }}
           envFrom:
+            {{- if .Values.azurite.enabled }}
+            - secretRef:
+                name: {{ include "celld.azurite.secretName" . }}
+            {{- end }}
             {{- if .Values.credentials.existingSecret }}
             - secretRef:
                 name: {{ .Values.credentials.existingSecret }}
@@ -94,6 +143,15 @@ spec:
             {{- with .Values.extraEnvFrom }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- end }}
+          {{- if .Values.azurite.enabled }}
+          startupProbe:
+            httpGet:
+              path: /__celld/health
+              port: http
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 30
           {{- end }}
           readinessProbe:
             httpGet:

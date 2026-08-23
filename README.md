@@ -6,6 +6,8 @@ Each replica is a fleet node. Nodes coordinate through an object-storage bucket 
 
 ## Install
 
+AWS / production bucket:
+
 ```bash
 helm repo add celld https://hops-ops.github.io/celld-chart
 helm install celld celld/celld \
@@ -15,6 +17,17 @@ helm install celld celld/celld \
   --set celld.region=us-east-2 \
   --set credentials.existingSecret=celld-aws
 ```
+
+Local / kind (in-cluster Azurite, same shape as `distributed/tests/celld/docker-compose.yml`):
+
+```bash
+helm install celld celld/celld \
+  --namespace celld \
+  --create-namespace \
+  --set azurite.enabled=true
+```
+
+Azurite is a development store. celld's emulator client always uses `127.0.0.1:10000`; the chart runs a socat sidecar that forwards that port to the Azurite Service.
 
 `credentials.existingSecret` should contain `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (plus `AWS_SESSION_TOKEN` when using temporary credentials).
 

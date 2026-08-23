@@ -38,3 +38,15 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- default "default" .Values.serviceAccount.name -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "celld.azurite.fullname" -}}
+{{- printf "%s-azurite" (include "celld.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "celld.azurite.secretName" -}}
+{{- printf "%s-azurite" (include "celld.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "celld.azurite.connectionString" -}}
+DefaultEndpointsProtocol=http;AccountName={{ .Values.azurite.accountName }};AccountKey={{ .Values.azurite.accountKey }};BlobEndpoint=http://{{ include "celld.azurite.fullname" . }}:{{ .Values.azurite.blobPort }}/{{ .Values.azurite.accountName }};
+{{- end -}}

@@ -1,0 +1,115 @@
+{{- if .Values.azurite.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "celld.azurite.secretName" . }}
+  labels:
+    {{- include "celld.labels" . | nindent 4 }}
+    app.kubernetes.io/component: azurite
+type: Opaque
+stringData:
+  AZURE_STORAGE_USE_EMULATOR: "true"
+  AZURE_STORAGE_ACCOUNT_NAME: {{ .Values.azurite.accountName | quote }}
+  AZURE_STORAGE_ACCOUNT_KEY: {{ .Values.azurite.accountKey | quote }}
+  AZURE_STORAGE_CONNECTION_STRING: {{ include "celld.azurite.connectionString" . | quote }}
+{{- if .Values.azurite.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "celld.azurite.fullname" . }}
+  labels:
+    {{- include "celld.labels" . | nindent 4 }}
+    app.kubernetes.io/component: azurite
+spec:
+  accessModes:
+    {{- toYaml .Values.azurite.persistence.accessModes | nindent 4 }}
+  {{- if .Values.azurite.persistence.storageClassName }}
+  storageClassName: {{ .Values.azurite.persistence.storageClassName | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.azurite.persistence.size | quote }}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "celld.azurite.fullname" . }}
+  labels:
+    {{- include "celld.labels" . | nindent 4 }}
+    app.kubernetes.io/component: azurite
+spec:
+  type: ClusterIP
+  ports:
+    - name: blob
+      port: {{ .Values.azurite.blobPort }}
+      targetPort: blob
+      protocol: TCP
+  selector:
+    {{- include "celld.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: azurite
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "celld.azurite.fullname" . }}
+  labels:
+    {{- include "celld.labels" . | nindent 4 }}
+    app.kubernetes.io/component: azurite
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "celld.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: azurite
+  template:
+    metadata:
+      labels:
+        {{- include "celld.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: azurite
+    spec:
+      containers:
+        - name: azurite
+          image: "{{ .Values.azurite.image.repository }}:{{ .Values.azurite.image.tag }}"
+          imagePullPolicy: {{ .Values.azurite.image.pullPolicy }}
+          args:
+            - azurite-blob
+            - --blobHost
+            - 0.0.0.0
+            - --blobPort
+            - {{ .Values.azurite.blobPort | quote }}
+            - --skipApiVersionCheck
+            - --loose
+            - --location
+            - /data
+          ports:
+            - name: blob
+              containerPort: {{ .Values.azurite.blobPort }}
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: blob
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: blob
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          {{- with .Values.azurite.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: data
+          {{- if .Values.azurite.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "celld.azurite.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

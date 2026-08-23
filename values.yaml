@@ -27,6 +27,42 @@ credentials:
   # For GCS use GOOGLE_APPLICATION_CREDENTIALS via extraEnv + extraVolume, or ADC.
   existingSecret: ""
 
+# Local/dev only. Deploys Azurite and points celld at it (az:// container).
+# Not a production fleet store. Matches tests/celld/docker-compose.yml:
+# celld's Azure emulator client always uses 127.0.0.1:10000, so a socat
+# sidecar forwards that port to the Azurite Service.
+azurite:
+  enabled: false
+  container: celld
+  blobPort: 10000
+  # Public Microsoft Azurite emulator account — not a production secret.
+  accountName: devstoreaccount1
+  accountKey: Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
+  image:
+    repository: mcr.microsoft.com/azure-storage/azurite
+    tag: "3.34.0"
+    pullPolicy: IfNotPresent
+  initImage:
+    repository: mcr.microsoft.com/azure-cli
+    tag: "2.67.0"
+    pullPolicy: IfNotPresent
+  socatImage:
+    repository: docker.io/alpine/socat
+    tag: "1.8.0.1"
+    pullPolicy: IfNotPresent
+  persistence:
+    enabled: true
+    size: 2Gi
+    storageClassName: ""
+    accessModes:
+      - ReadWriteOnce
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
 extraEnv: []
 extraEnvFrom: []
 
