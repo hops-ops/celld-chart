@@ -43,6 +43,18 @@ Azurite is a development store. celld's emulator client always uses `127.0.0.1:1
 
 `credentials.existingSecret` should contain `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (plus `AWS_SESSION_TOKEN` when using temporary credentials).
 
+For hops `local aws` (INI file under Secret key `credentials`):
+
+```bash
+helm install celld celld/celld \
+  --namespace celld \
+  --create-namespace \
+  --set celld.bucket=s3://my-cells-bucket \
+  --set celld.region=us-east-2 \
+  --set credentials.sharedCredentialsSecret=aws-creds \
+  --set bootstrapPlaceholder=true
+```
+
 ## Ports
 
 | Port | Purpose |

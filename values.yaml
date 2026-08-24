@@ -26,6 +26,10 @@ credentials:
   # Secret with AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (and optional AWS_SESSION_TOKEN).
   # For GCS use GOOGLE_APPLICATION_CREDENTIALS via extraEnv + extraVolume, or ADC.
   existingSecret: ""
+  # Secret in AWS shared-credentials INI form (hops `local aws` writes key `credentials`).
+  # celld's S3 client reads AWS_* env vars, so the entrypoint parses the INI file.
+  sharedCredentialsSecret: ""
+  sharedCredentialsKey: credentials
 
 # Deploy a tiny fetch-only worker so celld can boot before a real app is uploaded.
 # Used for Azurite and for a fresh S3 bucket (celld requires deploy/current.json).

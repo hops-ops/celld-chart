@@ -97,6 +97,9 @@ spec:
             - -c
             - |
               set -eu
+              {{- if include "celld.sharedCredentials.enabled" . }}
+              {{ include "celld.exportSharedCredentials.sh" . | nindent 14 }}
+              {{- end }}
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends {{ if .Values.azurite.enabled }}socat {{ end }}curl ca-certificates xz-utils
               cd /tmp
@@ -119,6 +122,9 @@ spec:
           volumeMounts:
             - name: placeholder
               mountPath: /placeholder
+            {{- if include "celld.sharedCredentials.enabled" . }}
+            {{- include "celld.sharedCredentials.volumeMount" . | nindent 12 }}
+            {{- end }}
         {{- end }}
       {{- end }}
       containers:
@@ -147,6 +153,10 @@ spec:
             - /bin/sh
             - -c
             - |
+              set -eu
+              {{- if include "celld.sharedCredentials.enabled" . }}
+              {{ include "celld.exportSharedCredentials.sh" . | nindent 14 }}
+              {{- end }}
               exec /usr/local/bin/celld \
                 {{- if $bucket }}
                 --bucket {{ $bucket | quote }} \
@@ -229,6 +239,9 @@ spec:
               mountPath: /var/lib/celld
             - name: tmp
               mountPath: /tmp
+            {{- if include "celld.sharedCredentials.enabled" . }}
+            {{- include "celld.sharedCredentials.volumeMount" . | nindent 12 }}
+            {{- end }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -240,6 +253,14 @@ spec:
         - name: placeholder
           configMap:
             name: {{ include "celld.fullname" . }}-placeholder
+        {{- end }}
+        {{- if include "celld.sharedCredentials.enabled" . }}
+        - name: aws-shared-credentials
+          secret:
+            secretName: {{ .Values.credentials.sharedCredentialsSecret | quote }}
+            items:
+              - key: {{ .Values.credentials.sharedCredentialsKey | default "credentials" | quote }}
+                path: credentials
         {{- end }}
         {{- if .Values.persistence.existingClaim }}
         - name: data
