@@ -52,7 +52,7 @@ azurite:
     pullPolicy: IfNotPresent
   initImage:
     repository: mcr.microsoft.com/azure-cli
-    tag: "2.89.1"
+    tag: "2.90.0"
     pullPolicy: IfNotPresent
   socatImage:
     repository: docker.io/alpine/socat
