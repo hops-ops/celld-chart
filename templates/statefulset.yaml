@@ -3,6 +3,14 @@
 {{- $bucket = printf "az://%s" .Values.azurite.container -}}
 {{- end -}}
 {{- $placeholder := or .Values.bootstrapPlaceholder (and .Values.azurite.enabled .Values.azurite.bootstrapPlaceholder) -}}
+{{- $dev := .Values.dev.enabled -}}
+{{- $devHost := .Values.dev.hostPath | default "" -}}
+{{- $devMount := .Values.dev.mountPath | default "/workspace" -}}
+{{- $devProject := "/var/lib/celld/project" -}}
+{{- if $devHost }}{{- $devProject = $devMount }}{{- end -}}
+{{- $healthPath := "/__celld/health" -}}
+{{- if $dev }}{{- $healthPath = "/.well-known/celld/health" }}{{- end -}}
+{{- if $dev }}{{- $placeholder = false }}{{- $bucket = "" }}{{- end -}}
 {{- $volumeClaimTemplateLabels := dict -}}
 {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) -}}
 {{- $existingStatefulSet := lookup "apps/v1" "StatefulSet" .Release.Namespace (include "celld.fullname" .) -}}
@@ -20,7 +28,7 @@ metadata:
   labels:
     {{- include "celld.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ if $dev }}1{{ else }}{{ .Values.replicaCount }}{{ end }}
   serviceName: {{ include "celld.fullname" . }}-internal
   selector:
     matchLabels:
@@ -43,9 +51,38 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if or .Values.azurite.enabled $placeholder }}
+      {{- if or $dev (and (not $dev) (or .Values.azurite.enabled $placeholder)) }}
       initContainers:
-        {{- if .Values.azurite.enabled }}
+        {{- if $dev }}
+        - name: esbuild
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl ca-certificates
+              mkdir -p /opt/esbuild
+              cd /opt/esbuild
+              curl -fsSL https://esbuild.github.io/dl/v0.25.5 | sh
+              test -x /opt/esbuild/esbuild
+              {{- if not $devHost }}
+              mkdir -p /var/lib/celld/project
+              cp -L /placeholder/index.js /placeholder/wrangler.jsonc /var/lib/celld/project/
+              {{- end }}
+          volumeMounts:
+            - name: esbuild
+              mountPath: /opt/esbuild
+            {{- if not $devHost }}
+            - name: data
+              mountPath: /var/lib/celld
+            - name: placeholder
+              mountPath: /placeholder
+            {{- end }}
+        {{- end }}
+        {{- if and .Values.azurite.enabled (not $dev) }}
         - name: azurite-init
           image: "{{ .Values.azurite.initImage.repository }}:{{ .Values.azurite.initImage.tag }}"
           imagePullPolicy: {{ .Values.azurite.initImage.pullPolicy }}
@@ -128,7 +165,7 @@ spec:
         {{- end }}
       {{- end }}
       containers:
-        {{- if .Values.azurite.enabled }}
+        {{- if and .Values.azurite.enabled (not $dev) }}
         - name: azurite-forward
           image: "{{ .Values.azurite.socatImage.repository }}:{{ .Values.azurite.socatImage.tag }}"
           imagePullPolicy: {{ .Values.azurite.socatImage.pullPolicy }}
@@ -157,6 +194,22 @@ spec:
               {{- if include "celld.sharedCredentials.enabled" . }}
               {{ include "celld.exportSharedCredentials.sh" . | nindent 14 }}
               {{- end }}
+              {{- if $dev }}
+              export PATH="/opt/esbuild:$PATH"
+              export CELLD_ESBUILD=/opt/esbuild/esbuild
+              exec /usr/local/bin/celld dev {{ $devProject | quote }} \
+                --host 0.0.0.0 \
+                --port {{ .Values.dev.port }} \
+                {{- if .Values.dev.logs }}
+                --logs \
+                {{- end }}
+                {{- if .Values.dev.clean }}
+                --clean \
+                {{- end }}
+                {{- if or (not $devHost) (not .Values.dev.watch) }}
+                --no-watch
+                {{- end }}
+              {{- else }}
               exec /usr/local/bin/celld \
                 {{- if $bucket }}
                 --bucket {{ $bucket | quote }} \
@@ -164,9 +217,10 @@ spec:
                 --listen 0.0.0.0:{{ .Values.server.httpPort }} \
                 --internal-listen 0.0.0.0:{{ .Values.server.internalPort }} \
                 --advertise "${POD_IP}:{{ .Values.server.internalPort }}"
+              {{- end }}
           ports:
             - name: http
-              containerPort: {{ .Values.server.httpPort }}
+              containerPort: {{ if $dev }}{{ .Values.dev.port }}{{ else }}{{ .Values.server.httpPort }}{{ end }}
               protocol: TCP
             - name: internal
               containerPort: {{ .Values.server.internalPort }}
@@ -197,7 +251,7 @@ spec:
             {{- end }}
           {{- if or .Values.azurite.enabled .Values.credentials.existingSecret .Values.extraEnvFrom }}
           envFrom:
-            {{- if .Values.azurite.enabled }}
+            {{- if and .Values.azurite.enabled (not $dev) }}
             - secretRef:
                 name: {{ include "celld.azurite.secretName" . }}
             {{- end }}
@@ -209,10 +263,10 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
-          {{- if or .Values.azurite.enabled $placeholder }}
+          {{- if or $dev .Values.azurite.enabled $placeholder }}
           startupProbe:
             httpGet:
-              path: /__celld/health
+              path: {{ $healthPath }}
               port: http
             periodSeconds: 2
             timeoutSeconds: 2
@@ -220,7 +274,7 @@ spec:
           {{- end }}
           readinessProbe:
             httpGet:
-              path: /__celld/health
+              path: {{ $healthPath }}
               port: http
             initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
@@ -228,7 +282,7 @@ spec:
             failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
           livenessProbe:
             httpGet:
-              path: /__celld/health
+              path: {{ $healthPath }}
               port: http
             initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
@@ -239,6 +293,14 @@ spec:
               mountPath: /var/lib/celld
             - name: tmp
               mountPath: /tmp
+            {{- if $dev }}
+            - name: esbuild
+              mountPath: /opt/esbuild
+            {{- if $devHost }}
+            - name: project
+              mountPath: {{ $devMount | quote }}
+            {{- end }}
+            {{- end }}
             {{- if include "celld.sharedCredentials.enabled" . }}
             {{- include "celld.sharedCredentials.volumeMount" . | nindent 12 }}
             {{- end }}
@@ -249,6 +311,16 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if $dev }}
+        - name: esbuild
+          emptyDir: {}
+        {{- if $devHost }}
+        - name: project
+          hostPath:
+            path: {{ $devHost | quote }}
+            type: Directory
+        {{- end }}
+        {{- end }}
         {{- if $placeholder }}
         - name: placeholder
           configMap:
