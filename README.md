@@ -41,6 +41,18 @@ helm install celld celld/celld \
 
 Azurite is a development store. celld's emulator client always uses `127.0.0.1:10000`; the chart runs a socat sidecar that forwards that port to the Azurite Service.
 
+`celld dev` (local object store, one Wrangler project, no fleet bucket):
+
+```bash
+helm install celld celld/celld \
+  --namespace celld \
+  --create-namespace \
+  --set dev.enabled=true \
+  --set dev.hostPath=/path/visible/on/the/node/to/wrangler-project
+```
+
+`dev.hostPath` empty uses the chart's placeholder worker and `--no-watch`. The node path must be visible inside the cluster (kind extraMounts / hostPath). Dev mode forces one replica and ignores `azurite` and `celld.bucket`. Health is `GET /.well-known/celld/health`.
+
 `credentials.existingSecret` should contain `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (plus `AWS_SESSION_TOKEN` when using temporary credentials).
 
 For hops `local aws` (INI file under Secret key `credentials`):
@@ -62,7 +74,7 @@ helm install celld celld/celld \
 | 8080 | Public Worker / Durable Object HTTP |
 | 8081 | Internal peer + operator API — keep off the public internet |
 
-Health: `GET /__celld/health`.
+Health: `GET /__celld/health` (fleet). Dev mode uses `GET /.well-known/celld/health`.
 
 ## Values
 

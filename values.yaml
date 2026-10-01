@@ -72,6 +72,18 @@ azurite:
     limits:
       memory: 256Mi
 
+# celld dev: one local node, project store under .celld/dev, no fleet bucket.
+# Mutually exclusive with azurite and a bucket. One replica.
+dev:
+  enabled: false
+  # Node path of a Wrangler project. Empty uses the placeholder worker and --no-watch.
+  hostPath: ""
+  mountPath: /workspace
+  port: 8080
+  logs: true
+  watch: true
+  clean: false
+
 extraEnv: []
 extraEnvFrom: []
 

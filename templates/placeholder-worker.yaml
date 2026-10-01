@@ -1,4 +1,5 @@
-{{- if or .Values.bootstrapPlaceholder (and .Values.azurite.enabled .Values.azurite.bootstrapPlaceholder) }}
+{{- $devPlaceholder := and .Values.dev.enabled (not .Values.dev.hostPath) -}}
+{{- if or $devPlaceholder .Values.bootstrapPlaceholder (and (not .Values.dev.enabled) .Values.azurite.enabled .Values.azurite.bootstrapPlaceholder) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
