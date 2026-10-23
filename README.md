@@ -68,6 +68,24 @@ Health: `GET /__celld/health`.
 
 See `values.yaml`. The stack XRD `CelldStack` (`hops-ops/celld-stack`) passes these through as Helm values.
 
+`extraVolumes` / `extraVolumeMounts` add volumes to the pod and mounts to the
+celld container. For example, to trust a private CA for outbound `fetch`
+(celld reads `SSL_CERT_FILE` in addition to the public roots):
+
+```yaml
+extraEnv:
+  - name: SSL_CERT_FILE
+    value: /etc/celld/trust/ca.crt
+extraVolumes:
+  - name: trust
+    secret:
+      secretName: my-ca
+extraVolumeMounts:
+  - name: trust
+    mountPath: /etc/celld/trust
+    readOnly: true
+```
+
 ## License
 
 Apache-2.0

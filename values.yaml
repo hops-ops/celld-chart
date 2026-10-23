@@ -74,6 +74,10 @@ azurite:
 
 extraEnv: []
 extraEnvFrom: []
+# Extra volumes for the celld pod and their mounts in the celld container,
+# e.g. a CA bundle for outbound TLS (with SSL_CERT_FILE in extraEnv).
+extraVolumes: []
+extraVolumeMounts: []
 
 persistence:
   enabled: true
