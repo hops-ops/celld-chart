@@ -212,7 +212,7 @@ spec:
           {{- if or .Values.azurite.enabled $placeholder }}
           startupProbe:
             httpGet:
-              path: /__celld/health
+              path: /.well-known/celld/health
               port: http
             periodSeconds: 2
             timeoutSeconds: 2
@@ -220,7 +220,7 @@ spec:
           {{- end }}
           readinessProbe:
             httpGet:
-              path: /__celld/health
+              path: /.well-known/celld/health
               port: http
             initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
@@ -228,7 +228,7 @@ spec:
             failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
           livenessProbe:
             httpGet:
-              path: /__celld/health
+              path: /.well-known/celld/health
               port: http
             initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
