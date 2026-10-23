@@ -242,6 +242,9 @@ spec:
             {{- if include "celld.sharedCredentials.enabled" . }}
             {{- include "celld.sharedCredentials.volumeMount" . | nindent 12 }}
             {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -249,6 +252,9 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- if $placeholder }}
         - name: placeholder
           configMap:
