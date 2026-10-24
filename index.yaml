@@ -3,6 +3,28 @@ entries:
   celld:
   - apiVersion: v2
     appVersion: v0.3.0
+    created: "2026-10-24T02:11:02.133876428Z"
+    description: Self-hosted Durable Objects runtime (denoland/celld) for Kubernetes.
+    digest: 9cf1fe89338112903d3bb32751fc32a67de88a5d9f057801d3589494455c752f
+    home: https://celld.dev
+    keywords:
+    - celld
+    - durable-objects
+    - workers
+    - deno
+    maintainers:
+    - email: pat@patscott.io
+      name: Patrick Lee Scott
+    name: celld
+    sources:
+    - https://github.com/denoland/celld
+    - https://github.com/hops-ops/celld-chart
+    type: application
+    urls:
+    - https://hops-ops.github.io/celld-chart/celld-0.5.1.tgz
+    version: 0.5.1
+  - apiVersion: v2
+    appVersion: v0.3.0
     created: "2026-10-23T20:43:28.262832752Z"
     description: Self-hosted Durable Objects runtime (denoland/celld) for Kubernetes.
     digest: 537074ba249a4ce8abb20c044e10ef8329d4935b47692374e2d9b6910717da55
@@ -67,4 +89,4 @@ entries:
     urls:
     - https://hops-ops.github.io/celld-chart/celld-0.3.1.tgz
     version: 0.3.1
-generated: "2026-10-23T20:43:28.260287525Z"
+generated: "2026-10-24T02:11:02.131819353Z"
