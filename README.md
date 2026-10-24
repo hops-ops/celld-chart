@@ -62,7 +62,8 @@ helm install celld celld/celld \
 | 8080 | Public Worker / Durable Object HTTP |
 | 8081 | Internal peer + operator API — keep off the public internet |
 
-Health: `GET /__celld/health`.
+Health: `GET /.well-known/celld/health` on 8080, answered by celld itself
+(other paths, `/__celld/*` included, reach the deployed Worker).
 
 ## Values
 
